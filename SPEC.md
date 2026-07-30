@@ -8,6 +8,7 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 |--------|-----|-------|
 | Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | All models; free models are prefixed with `@cf` |
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
+| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 
 ## Data Model
 
@@ -32,7 +33,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"` or `"ollama"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, or `"nvidia"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -41,6 +42,7 @@ Each discovered model is normalized to the following schema:
 | `quantization` | string | no | Quantization level, e.g. `"q4_k_m"`, `"q8_0"`. Omit if unavailable. |
 | `context_length` | integer | no | Maximum context window in tokens. Omit if unavailable. |
 | `tags` | array[string] | no | Classification tags (e.g. `["vision"]`, `["code"]`, `["embedding"]`) |
+| `deprecated` | boolean | no | `true` if the model is marked as deprecated/legacy. Omit if `false`. |
 | `url` | string | yes | Permalink to the model's detail page |
 
 ## CLI Interface
@@ -49,7 +51,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -88,8 +90,18 @@ Options:
 - The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
 - Extract tags from category labels presented on the page.
 
+### NVIDIA Build
+
+- Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
+- Scope: Only models tagged with the `Coding` label.
+- Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
+- Extract `api_name` from the model's API identifier field or card data attribute.
+- Extract `provider` from the author/publisher field on each model card.
+- Pagination: follow "Load more" or "next page" links; stop when none remain.
+
 ### Common Rules
 
+- **Exclude deprecated models**: Skip any model explicitly marked as deprecated, legacy, or end-of-life by the source. Set `deprecated: true` if the source distinguishes but you still choose to emit it; otherwise omit the entry entirely.
 - **Deduplication**: If repeated `api_name` values appear from the same source, keep only the first occurrence. (Different sources may overlap; keep both.)
 - **Missing fields**: Omit the JSON key entirely rather than emitting `null`.
 - **Encoding**: All string values must be valid UTF-8. Replace or skip invalid byte sequences.
@@ -133,6 +145,7 @@ src/
     mod.rs        -- Scraper trait + dispatch logic
     cloudflare.rs -- Cloudflare page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
+    nvidia.rs     -- NVIDIA Build page scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
