@@ -11,6 +11,7 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | GitHub Marketplace | `https://github.com/marketplace?type=models` | `GET https://models.github.ai/catalog/models` | All models available via free rate limits |
 | Groq | `https://console.groq.com/docs/models` | `GET https://api.groq.com/openai/v1/models` | Free models only (exclude paid) |
 | Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
+| Mistral AI | `https://mistral.ai/models/` | `GET https://api.mistral.ai/v1/models` (requires API key) | Open-weight/free models only |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
 | Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
 | Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
@@ -41,7 +42,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"nvidia"`, `"ollama"`, `"openrouter"`, or `"pollinations"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"mistral"`, `"nvidia"`, `"ollama"`, `"openrouter"`, or `"pollinations"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -60,7 +61,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, nvidia, ollama, openrouter, pollinations, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, mistral, nvidia, ollama, openrouter, pollinations, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -158,6 +159,17 @@ Options:
   - The `api_name` is the raw Model ID (e.g. `"stepfun/step-3.7-flash:free"`).
   - Free model IDs end with `:free` suffix.
   - Skip auto/routing models (e.g. `kilo-auto/*`).
+
+### Mistral AI
+
+- Page: `https://mistral.ai/models/`
+- Primary: Parse the HTML page directly (the API at `GET https://api.mistral.ai/v1/models` requires authentication and is less accessible).
+- The page lists models in cards with model ID, tags (Open/Premier/Labs), and description.
+- Extract `api_name` from the model ID label on each card (e.g. `mistral-large-latest`, `mistral-small-latest`, `codestral-latest`, `ministral-8b-latest`, `mistral-embed`, `open-mistral-nemo`).
+- Extract `provider` as `"Mistral"` for all models.
+- Only collect models tagged as **Open** (open-weight, Apache 2.0 or similar license). Skip models tagged as **Premier** (paid API-only). Skip **Labs** models (experimental).
+- Extract `context_length` from the model's specifications if listed on the card.
+- Mark all collected models as `free: true`.
 
 ### NVIDIA Build
 
@@ -263,6 +275,7 @@ src/
     github.rs     -- GitHub Marketplace catalog API scraper
     groq.rs       -- Groq API + HTML fallback scraper
     kilo.rs       -- Kilo AI Gateway API + HTML fallback scraper
+    mistral.rs    -- Mistral AI page scraper
     nvidia.rs     -- NVIDIA Build page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
     openrouter.rs -- OpenRouter API + HTML fallback scraper
