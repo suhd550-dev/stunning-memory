@@ -13,6 +13,7 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
 | LLM7 | `https://docs.llm7.io/guides/models` | `GET https://api.llm7.io/v1/models` | Turbo-tier (free) models only |
 | Mistral AI | `https://mistral.ai/models/` | `GET https://api.mistral.ai/v1/models` (requires API key) | Open-weight/free models only |
+| Modal | `https://modal.com/library` | — (data compiled into JS bundle) | Open-source models deployable on Modal |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
 | Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | Free cloud inference models only |
 | Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
@@ -43,7 +44,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"nvidia"`, `"ollama"`, `"openrouter"`, or `"pollinations"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"modal"`, `"nvidia"`, `"ollama"`, `"openrouter"`, or `"pollinations"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -62,7 +63,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, llm7, mistral, nvidia, ollama, openrouter, pollinations, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, llm7, mistral, modal, nvidia, ollama, openrouter, pollinations, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -187,6 +188,17 @@ Options:
 - Extract `context_length` from the model's specifications if listed on the card.
 - Mark all collected models as `free: true`.
 
+### Modal
+
+- Page: `https://modal.com/library`
+- No public API available. Model data is compiled into the SvelteKit JavaScript bundle at build time.
+- Parse the rendered HTML page directly. Models are listed in category groups (Large language models, Audio transcription, Image generation, Text embedding).
+- Each model card contains: `name`, `tag` (e.g. LLM, H100), `specs` (comma-separated tags), `description`, and a `link` to a detail page.
+- Extract `api_name` from the model's name slugified (e.g. `"Kimi K3"` -> `"kimi-k3"`).
+- Extract `provider` from the model name prefix or detail page content (e.g. `"Kimi K3"` -> `"Moonshot AI"`, `"Llama"` -> `"Meta"`).
+- All models listed on Modal's library are open-source and free to download/run (compute costs apply on Modal). Mark all as `free: true`.
+- Note: Modal is a compute platform, not a model provider. The library showcases open-source models you can deploy there.
+
 ### NVIDIA Build
 
 - Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
@@ -295,6 +307,7 @@ src/
     kilo.rs       -- Kilo AI Gateway API + HTML fallback scraper
     llm7.rs       -- LLM7 API + HTML fallback scraper
     mistral.rs    -- Mistral AI page scraper
+    modal.rs      -- Modal library page scraper
     nvidia.rs     -- NVIDIA Build page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
     openrouter.rs -- OpenRouter API + HTML fallback scraper
