@@ -8,11 +8,13 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 |--------|------------|---------|------------------|
 | Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | — | Models with `@cf` prefix (free tier) |
 | Cohere | `https://docs.cohere.com/docs/models` | — | Free-tier models only |
-| GitHub Marketplace | `https://github.com/marketplace?type=models` (fallback) | `GET https://models.github.ai/catalog/models` | All models available via free rate limits |
-| Groq | `https://console.groq.com/docs/models` (fallback) | `GET https://api.groq.com/openai/v1/models` | Free models only (exclude paid) |
-| Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` (fallback) | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
+| GitHub Marketplace | `https://github.com/marketplace?type=models` | `GET https://models.github.ai/catalog/models` | All models available via free rate limits |
+| Groq | `https://console.groq.com/docs/models` | `GET https://api.groq.com/openai/v1/models` | Free models only (exclude paid) |
+| Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
-| Ollama | `https://ollama.com/search?c=cloud` (fallback) | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
+| Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
+
+> **Note**: The API endpoint for listing models is the preferred method. However, since we have no access to it, we have no choice but to use the HTML page.
 
 ## Data Model
 
