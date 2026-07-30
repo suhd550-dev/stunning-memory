@@ -4,17 +4,15 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 
 ## Input Sources
 
-| Source | URL | Free Model Scope |
-|--------|-----|------------------|
-| Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | Models with `@cf` prefix (free tier) |
-| Cohere | `https://docs.cohere.com/docs/models` | Free-tier models only |
-| GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models available via free rate limits |
-| | `https://github.com/marketplace?type=models` (HTML fallback) | |
-| Groq | `https://console.groq.com/docs/models` | Free models only (exclude paid) |
-| Kilo AI Gateway | `GET https://api.kilo.ai/api/gateway/models` (preferred) | Free models only (identified by `:free` suffix) |
-| | `https://kilo.ai/docs/gateway/models-and-providers` (HTML fallback) | |
-| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models with free tier |
-| Ollama | `https://ollama.com/search?c=cloud` | All models (Ollama is fully open-source/free) |
+| Source | Website URL | API URL | Free Model Scope |
+|--------|------------|---------|------------------|
+| Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | — | Models with `@cf` prefix (free tier) |
+| Cohere | `https://docs.cohere.com/docs/models` | — | Free-tier models only |
+| GitHub Marketplace | `https://github.com/marketplace?type=models` (fallback) | `GET https://models.github.ai/catalog/models` | All models available via free rate limits |
+| Groq | `https://console.groq.com/docs/models` (fallback) | `GET https://api.groq.com/openai/v1/models` | Free models only (exclude paid) |
+| Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` (fallback) | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
+| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
+| Ollama | `https://ollama.com/search?c=cloud` (fallback) | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
 
 ## Data Model
 
