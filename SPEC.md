@@ -1,20 +1,20 @@
 # Model Discovery
 
-A Rust CLI tool that scrapes AI model metadata (names, API identifiers, parameters, quantization, context length, tags, etc.) from HTML pages and APIs, and outputs normalized JSON for downstream harness consumption.
+A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers, parameters, quantization, context length, tokens, tags, etc.) from HTML pages and APIs, and outputs normalized JSON for downstream harness consumption. Only models available at no cost are collected; paid models are excluded.
 
 ## Input Sources
 
-| Source | URL | Scope |
-|--------|-----|-------|
-| Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | All models; free models are prefixed with `@cf` |
-| Cohere | `https://docs.cohere.com/docs/models` | All documented models |
-| GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models in GitHub Marketplace |
+| Source | URL | Free Model Scope |
+|--------|-----|------------------|
+| Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | Models with `@cf` prefix (free tier) |
+| Cohere | `https://docs.cohere.com/docs/models` | Free-tier models only |
+| GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models available via free rate limits |
 | | `https://github.com/marketplace?type=models` (HTML fallback) | |
-| Groq | `https://console.groq.com/docs/models` | All listed models (API auth required) |
-| Kilo AI Gateway | `GET https://api.kilo.ai/api/gateway/models` (preferred) | All models accessible via Kilo Gateway |
+| Groq | `https://console.groq.com/docs/models` | Free models only (exclude paid) |
+| Kilo AI Gateway | `GET https://api.kilo.ai/api/gateway/models` (preferred) | Free models only (identified by `:free` suffix) |
 | | `https://kilo.ai/docs/gateway/models-and-providers` (HTML fallback) | |
-| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
-| Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
+| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models with free tier |
+| Ollama | `https://ollama.com/search?c=cloud` | All models (Ollama is fully open-source/free) |
 
 ## Data Model
 
@@ -48,6 +48,7 @@ Each discovered model is normalized to the following schema:
 | `quantization` | string | no | Quantization level, e.g. `"q4_k_m"`, `"q8_0"`. Omit if unavailable. |
 | `context_length` | integer | no | Maximum context window in tokens. Omit if unavailable. |
 | `tags` | array[string] | no | Classification tags (e.g. `["vision"]`, `["code"]`, `["embedding"]`) |
+| `free` | boolean | yes | `true` if the model is available at no cost. `false` for paid-only models. |
 | `deprecated` | boolean | no | `true` if the model is marked as deprecated/legacy. Omit if `false`. |
 | `url` | string | yes | Permalink to the model's detail page |
 
@@ -83,7 +84,7 @@ Options:
 ### Cloudflare
 
 - Page: `https://developers.cloudflare.com/workers-ai/models/`
-- Models with `api_name` starting with `@cf` are free-tier eligible; retain the `@cf` prefix in `api_name`.
+- Only collect models with `api_name` starting with `@cf` (free-tier eligible). Retain the `@cf` prefix in `api_name`.
 - Extract `provider` from the first segment of `api_name` after `@cf`, e.g. `@cf/moonshotai/...` -> `provider: "moonshotai"`.
 - The `slug` is the trailing path segment of the model's detail page URL.
 - Pagination: follow "next page" links if present; stop when none remain.
@@ -92,7 +93,8 @@ Options:
 ### Cohere
 
 - Page: `https://docs.cohere.com/docs/models`
-- Parse the models table/cards listing available Cohere models (e.g. Command R+, Command R, embed-english-v3.0, etc.).
+- Parse the models table/cards listing available Cohere models.
+- Only collect models listed as free or with no associated cost. Skip models marked with paid-only pricing tiers.
 - Extract `api_name` from the model's API identifier column (e.g. `command-r-plus`, `command-r`, `embed-english-v3.0`).
 - Extract `context_length` if listed (Cohere documents max tokens per model).
 - Extract `provider` as `"cohere"` for all models on this page.
@@ -112,10 +114,12 @@ Options:
     - `capabilities` -> `capabilities` array (stored in a `capabilities` field if desired)
   - No pagination needed; the endpoint returns all models in a single response.
   - The API only returns active models; no explicit deprecated filtering is needed.
+  - All models listed are available under free rate limits. Mark all as `free: true`.
 - **Fallback**: Parse the HTML at `https://github.com/marketplace?type=models` when the API is unavailable.
   - The page requires authentication; the scraper must handle GitHub's sign-in redirect or use stored credentials.
   - Extract model cards from the marketplace grid listing.
   - Extract `api_name` from the model's card data or URL path (e.g. `/marketplace/models/azure-openai/gpt-4-1` -> `openai/gpt-4.1`).
+  - All models on the marketplace page are available under free rate limits; mark all as `free: true`.
   - Fallback to HTML scraping only for non-interactive/SSR rendered content; skip dynamic client-side rendered sections.
 
 ### Groq
@@ -124,8 +128,10 @@ Options:
   - `source` -> `"groq"`
   - `api_name` -> `id` field (e.g. `"llama-3.3-70b-versatile"`)
   - `provider` -> `owned_by` field
+  - The API returns all models regardless of pricing. Cross-reference with the HTML page's PRICE column to identify and keep only free models.
 - Fallback: Parse the HTML at `https://console.groq.com/docs/models` when the API key is unavailable.
   - The page lists models in tables with columns: MODEL ID, SPEED, PRICE, RATE LIMITS, CONTEXT WINDOW, MAX COMPLETION TOKENS.
+  - Only collect models where PRICE is `$0.00` or listed as free. Skip any model with a non-zero price.
   - Extract `api_name` from the MODEL ID column.
   - Extract `context_length` from the CONTEXT WINDOW column.
   - Extract `provider` from the model name/icon label (e.g. Meta, OpenAI, Alibaba Cloud).
@@ -142,31 +148,37 @@ Options:
   - `provider` -> Provider field (e.g. `"Anthropic"`, `"OpenAI"`, `"Google"`)
   - `context_length` -> from context window field
   - Models use the format `provider/model-name`; the provider segment can be extracted from the prefix.
+  - Only collect free models. Free models are identified by a `:free` suffix in the model ID (e.g. `"stepfun/step-3.7-flash:free"`). Skip any model without this suffix.
+  - Mark all collected models as `free: true`.
 - Fallback: Parse the HTML at `https://kilo.ai/docs/gateway/models-and-providers`.
-  - Extract models from the "Popular models" and "Free models" tables.
+  - Extract free models from the "Free models" table specifically. Skip the "Popular models" table (paid).
   - Each row contains Model ID, Provider, and Description.
-  - The `api_name` is the raw Model ID (e.g. `"anthropic/claude-opus-4.7"`).
-  - Skip auto/routing models (e.g. `kilo-auto/*`).
+  - The `api_name` is the raw Model ID (e.g. `"stepfun/step-3.7-flash:free"`).
   - Free model IDs end with `:free` suffix.
+  - Skip auto/routing models (e.g. `kilo-auto/*`).
 
 ### NVIDIA Build
 
 - Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
-- Scope: Only models tagged with the `Coding` label.
+- Scope: Only models tagged with the `Coding` label that offer a free trial or free tier.
 - Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
+- Filter out any model that requires payment (no free tier available).
 - Extract `api_name` from the model's API identifier field or card data attribute.
 - Extract `provider` from the author/publisher field on each model card.
 - Pagination: follow "Load more" or "next page" links; stop when none remain.
+- Mark all collected models as `free: true`.
 
 ### Ollama
 
 - Primary: Use the official Ollama API endpoint if available (`https://ollama.com/api/models` or similar documented endpoint).
 - Fallback: Parse the HTML at `https://ollama.com/search?c=cloud` when the API is unavailable.
+- All Ollama models are open-source and free to use. Mark all collected models as `free: true`.
 - The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
 - Extract tags from category labels presented on the page.
 
 ### Common Rules
 
+- **Free models only**: Only collect models that are available at no cost. Set `free: true` for all output models. Skip any model that requires payment. The definition of "free" per source is detailed in the source-specific sections above.
 - **Exclude deprecated models**: Skip any model explicitly marked as deprecated, legacy, or end-of-life by the source. Set `deprecated: true` if the source distinguishes but you still choose to emit it; otherwise omit the entry entirely.
 - **Deduplication**: If repeated `api_name` values appear from the same source, keep only the first occurrence. (Different sources may overlap; keep both.)
 - **Missing fields**: Omit the JSON key entirely rather than emitting `null`.
