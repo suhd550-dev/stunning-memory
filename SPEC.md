@@ -7,6 +7,7 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | Source | Website URL | API URL | Free Model Scope |
 |--------|------------|---------|------------------|
 | Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | — | Models with `@cf` prefix (free tier) |
+| Cerebras | `https://inference-docs.cerebras.ai/models/overview` | `GET https://api.cerebras.ai/public/v1/models` | Models with free trial tier (pay-as-you-go pricing) |
 | Cohere | `https://docs.cohere.com/docs/models` | — | Free-tier models only |
 | GitHub Marketplace | `https://github.com/marketplace?type=models` | `GET https://models.github.ai/catalog/models` | All models available via free rate limits |
 | Groq | `https://console.groq.com/docs/models` | `GET https://api.groq.com/openai/v1/models` | Free models only (exclude paid) |
@@ -45,7 +46,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"modal"`, `"nvidia"`, `"ollama"`, `"openrouter"`, `"pollinations"`, or `"requesty"` |
+| `source` | string | yes | Origin provider key: `"cerebras"`, `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"modal"`, `"nvidia"`, `"ollama"`, `"openrouter"`, `"pollinations"`, or `"requesty"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -64,7 +65,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, llm7, mistral, modal, nvidia, ollama, openrouter, pollinations, requesty, all]
+  <SOURCE>  Source to scrape [possible values: cerebras, cloudflare, cohere, github, groq, kilo, llm7, mistral, modal, nvidia, ollama, openrouter, pollinations, requesty, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -95,6 +96,32 @@ Options:
 - The `slug` is the trailing path segment of the model's detail page URL.
 - Pagination: follow "next page" links if present; stop when none remain.
 - Gracefully skip rows whose structure differs from the expected model card format.
+
+### Cerebras
+
+- Page: `https://inference-docs.cerebras.ai/models/overview`
+- Primary (preferred): `GET https://api.cerebras.ai/public/v1/models` (public, no authentication required).
+  - Returns an OpenAI-compatible JSON object with a `data` array. Each entry maps as follows:
+    - `source` -> `"cerebras"`
+    - `api_name` -> `id` field (e.g. `"gpt-oss-120b"`)
+    - `name` -> `name` field
+    - `provider` -> `owned_by` field (e.g. `"OpenAI"`, `"Google"`, `"Z.ai"`)
+    - `parameters` -> extract from HTML page or omit if unavailable (API does not provide parameter count)
+    - `context_length` -> `limits.max_context_length` field
+    - `quantization` -> `quantization` field (e.g. `"FP16/8 (weights only)"`)
+    - `tags` -> derive from `capabilities` (e.g. `vision: true` -> `["vision"]`)
+    - `free` -> `false` (Cerebras offers a free trial but models have pay-as-you-go pricing)
+    - `deprecated` -> `deprecated` field
+    - `preview` -> `preview` field (store if desired)
+    - `url` -> `https://inference-docs.cerebras.ai/models/{slug}` where slug is derived from `id`
+  - Models on Cerebras have non-zero pricing (per-token charges). Mark all as `free: false` since they are not perpetually free.
+  - No pagination needed; the endpoint returns all models in a single response.
+- Fallback: Parse the HTML at `https://inference-docs.cerebras.ai/models/overview`.
+  - The page lists models in production and preview tables.
+  - Extract `api_name` from the Model ID column.
+  - Extract `name` from the Model Name column (linked text).
+  - Extract `parameters` from the Parameters column (e.g. `"120 billion"`).
+  - Skip any model marked as deprecated.
 
 ### Cohere
 
@@ -322,6 +349,7 @@ src/
   scrape/
     mod.rs        -- Scraper trait + dispatch logic
     cloudflare.rs -- Cloudflare page scraper
+    cerebras.rs   -- Cerebras API + HTML fallback scraper
     cohere.rs     -- Cohere docs page scraper
     github.rs     -- GitHub Marketplace catalog API scraper
     groq.rs       -- Groq API + HTML fallback scraper
