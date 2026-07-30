@@ -14,13 +14,13 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | LLM7 | `https://docs.llm7.io/guides/models` | `GET https://api.llm7.io/v1/models` | Turbo-tier (free) models only |
 | Mistral AI | `https://mistral.ai/models/` | `GET https://api.mistral.ai/v1/models` (requires API key) | Open-weight/free models only |
 | Modal | `https://modal.com/library` | — (data compiled into JS bundle) | Open-source models deployable on Modal |
-| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
+| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | `GET https://integrate.api.nvidia.com/v1/models` | Coding-tagged models with free tier |
 | Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | Free cloud inference models only |
 | OpenRouter | `https://openrouter.ai/models?max_output_price=0&output_modalities=text` | `GET https://openrouter.ai/api/v1/models` | Free models only (price = $0) |
 | Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
 | Requesty | `https://www.requesty.ai/models?free=1` | `GET https://router.requesty.ai/v1/models` | Free models only (price = $0) |
 
-> **Note**: The API endpoint for listing models is the preferred method. However, since we have no access to it, we have no choice but to use the HTML page.
+> **Note**: API endpoints are the preferred method for listing models. Sources marked with `—` have no public, unauthenticated API available, so HTML scraping is the only option. Auth-required APIs (Mistral, Groq, Cohere) are listed but may fall back to HTML when credentials are unavailable.
 
 ## Data Model
 
@@ -203,12 +203,20 @@ Options:
 ### NVIDIA Build
 
 - Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
-- Scope: Only models tagged with the `Coding` label that offer a free trial or free tier.
-- Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
-- Filter out any model that requires payment (no free tier available).
-- Extract `api_name` from the model's API identifier field or card data attribute.
-- Extract `provider` from the author/publisher field on each model card.
-- Pagination: follow "Load more" or "next page" links; stop when none remain.
+- Primary (preferred): `GET https://integrate.api.nvidia.com/v1/models` (public, no authentication required).
+  - Returns an OpenAI-compatible JSON object with a `data` array. Each entry maps as follows:
+    - `source` -> `"nvidia"`
+    - `api_name` -> `id` field (e.g. `"nvidia/llama-3.1-nemotron-70b-instruct"`)
+    - `provider` -> `owned_by` field (e.g. `"nvidia"`, `"meta"`, `"mistralai"`)
+  - The API does not provide pricing/free tier information. Cross-reference with the HTML page to determine which models have a free tier.
+  - No pagination needed; the endpoint returns all models in a single response.
+- Fallback: Parse the HTML at `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`.
+  - Scope: Only models tagged with the `Coding` label that offer a free trial or free tier.
+  - Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
+  - Filter out any model that requires payment (no free tier available).
+  - Extract `api_name` from the model's API identifier field or card data attribute.
+  - Extract `provider` from the author/publisher field on each model card.
+  - Pagination: follow "Load more" or "next page" links; stop when none remain.
 - Mark all collected models as `free: true`.
 
 ### Ollama
