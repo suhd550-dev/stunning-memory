@@ -9,6 +9,7 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | All models; free models are prefixed with `@cf` |
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
+| Cohere | `https://docs.cohere.com/docs/models` | All documented models |
 
 ## Data Model
 
@@ -33,7 +34,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, or `"nvidia"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, `"nvidia"`, or `"cohere"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -51,7 +52,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, cohere, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -98,6 +99,15 @@ Options:
 - Extract `api_name` from the model's API identifier field or card data attribute.
 - Extract `provider` from the author/publisher field on each model card.
 - Pagination: follow "Load more" or "next page" links; stop when none remain.
+
+### Cohere
+
+- Page: `https://docs.cohere.com/docs/models`
+- Parse the models table/cards listing available Cohere models (e.g. Command R+, Command R, embed-english-v3.0, etc.).
+- Extract `api_name` from the model's API identifier column (e.g. `command-r-plus`, `command-r`, `embed-english-v3.0`).
+- Extract `context_length` if listed (Cohere documents max tokens per model).
+- Extract `provider` as `"cohere"` for all models on this page.
+- Filter out any model explicitly marked as deprecated, legacy, or retired.
 
 ### Common Rules
 
@@ -146,6 +156,7 @@ src/
     cloudflare.rs -- Cloudflare page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
     nvidia.rs     -- NVIDIA Build page scraper
+    cohere.rs     -- Cohere docs page scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
