@@ -11,6 +11,8 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models in GitHub Marketplace |
 | | `https://github.com/marketplace?type=models` (HTML fallback) | |
 | Groq | `https://console.groq.com/docs/models` | All listed models (API auth required) |
+| Kilo AI Gateway | `GET https://api.kilo.ai/api/gateway/models` (preferred) | All models accessible via Kilo Gateway |
+| | `https://kilo.ai/docs/gateway/models-and-providers` (HTML fallback) | |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 
@@ -37,7 +39,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"nvidia"`, or `"ollama"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"nvidia"`, or `"ollama"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -55,7 +57,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, nvidia, ollama, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, nvidia, ollama, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -131,6 +133,22 @@ Options:
   - Skip the **Deprecated Models** section entirely.
   - Skip Preview models unless explicitly requested (they are marked as not for production use).
 
+### Kilo AI Gateway
+
+- Primary (preferred): `GET https://api.kilo.ai/api/gateway/models` (public, no authentication required).
+  - Returns model info including model ID, provider, pricing, context window, and supported features.
+  - `source` -> `"kilo"`
+  - `api_name` -> Model ID field (e.g. `"anthropic/claude-sonnet-4.6"`)
+  - `provider` -> Provider field (e.g. `"Anthropic"`, `"OpenAI"`, `"Google"`)
+  - `context_length` -> from context window field
+  - Models use the format `provider/model-name`; the provider segment can be extracted from the prefix.
+- Fallback: Parse the HTML at `https://kilo.ai/docs/gateway/models-and-providers`.
+  - Extract models from the "Popular models" and "Free models" tables.
+  - Each row contains Model ID, Provider, and Description.
+  - The `api_name` is the raw Model ID (e.g. `"anthropic/claude-opus-4.7"`).
+  - Skip auto/routing models (e.g. `kilo-auto/*`).
+  - Free model IDs end with `:free` suffix.
+
 ### NVIDIA Build
 
 - Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
@@ -195,6 +213,7 @@ src/
     cohere.rs     -- Cohere docs page scraper
     github.rs     -- GitHub Marketplace catalog API scraper
     groq.rs       -- Groq API + HTML fallback scraper
+    kilo.rs       -- Kilo AI Gateway API + HTML fallback scraper
     nvidia.rs     -- NVIDIA Build page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
   model.rs        -- Model struct + serialization
