@@ -10,6 +10,7 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 | Cohere | `https://docs.cohere.com/docs/models` | All documented models |
+| GitHub Marketplace | `GET https://models.github.ai/catalog/models` | All models in GitHub Marketplace (API, no auth required) |
 
 ## Data Model
 
@@ -34,7 +35,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, `"nvidia"`, or `"cohere"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, `"nvidia"`, `"cohere"`, or `"github"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -52,7 +53,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, cohere, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, cohere, github, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -109,6 +110,21 @@ Options:
 - Extract `provider` as `"cohere"` for all models on this page.
 - Filter out any model explicitly marked as deprecated, legacy, or retired.
 
+### GitHub Marketplace
+
+- API: `GET https://models.github.ai/catalog/models` (public, no authentication required).
+- Response is a JSON array. Each entry maps to the data model as follows:
+  - `source` -> `"github"`
+  - `api_name` -> `id` field (e.g. `"openai/gpt-4.1"`)
+  - `name` -> `name` field
+  - `provider` -> `publisher` field
+  - `tags` -> `tags` array
+  - `context_length` -> `limits.max_input_tokens`
+  - `url` -> `html_url` field
+  - `capabilities` -> `capabilities` array (stored in a `capabilities` field if desired)
+- No pagination needed; the endpoint returns all models in a single response.
+- The API only returns active models; no explicit deprecated filtering is needed.
+
 ### Common Rules
 
 - **Exclude deprecated models**: Skip any model explicitly marked as deprecated, legacy, or end-of-life by the source. Set `deprecated: true` if the source distinguishes but you still choose to emit it; otherwise omit the entry entirely.
@@ -157,6 +173,7 @@ src/
     ollama.rs     -- Ollama API + HTML fallback scraper
     nvidia.rs     -- NVIDIA Build page scraper
     cohere.rs     -- Cohere docs page scraper
+    github.rs     -- GitHub Marketplace catalog API scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
