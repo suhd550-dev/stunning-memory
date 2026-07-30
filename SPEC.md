@@ -7,11 +7,11 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | Source | URL | Scope |
 |--------|-----|-------|
 | Cloudflare Workers AI | `https://developers.cloudflare.com/workers-ai/models/` | All models; free models are prefixed with `@cf` |
-| Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
-| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 | Cohere | `https://docs.cohere.com/docs/models` | All documented models |
 | GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models in GitHub Marketplace |
 | | `https://github.com/marketplace?type=models` (HTML fallback) | |
+| NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
+| Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 
 ## Data Model
 
@@ -36,7 +36,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"ollama"`, `"nvidia"`, `"cohere"`, or `"github"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"nvidia"`, or `"ollama"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -54,7 +54,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, ollama, nvidia, cohere, github, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, nvidia, ollama, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -86,22 +86,6 @@ Options:
 - Pagination: follow "next page" links if present; stop when none remain.
 - Gracefully skip rows whose structure differs from the expected model card format.
 
-### Ollama
-
-- Primary: Use the official Ollama API endpoint if available (`https://ollama.com/api/models` or similar documented endpoint).
-- Fallback: Parse the HTML at `https://ollama.com/search?c=cloud` when the API is unavailable.
-- The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
-- Extract tags from category labels presented on the page.
-
-### NVIDIA Build
-
-- Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
-- Scope: Only models tagged with the `Coding` label.
-- Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
-- Extract `api_name` from the model's API identifier field or card data attribute.
-- Extract `provider` from the author/publisher field on each model card.
-- Pagination: follow "Load more" or "next page" links; stop when none remain.
-
 ### Cohere
 
 - Page: `https://docs.cohere.com/docs/models`
@@ -130,6 +114,22 @@ Options:
   - Extract model cards from the marketplace grid listing.
   - Extract `api_name` from the model's card data or URL path (e.g. `/marketplace/models/azure-openai/gpt-4-1` -> `openai/gpt-4.1`).
   - Fallback to HTML scraping only for non-interactive/SSR rendered content; skip dynamic client-side rendered sections.
+
+### NVIDIA Build
+
+- Page: `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding`
+- Scope: Only models tagged with the `Coding` label.
+- Filter out any model explicitly marked as **Deprecated** or **Legacy** on the page.
+- Extract `api_name` from the model's API identifier field or card data attribute.
+- Extract `provider` from the author/publisher field on each model card.
+- Pagination: follow "Load more" or "next page" links; stop when none remain.
+
+### Ollama
+
+- Primary: Use the official Ollama API endpoint if available (`https://ollama.com/api/models` or similar documented endpoint).
+- Fallback: Parse the HTML at `https://ollama.com/search?c=cloud` when the API is unavailable.
+- The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
+- Extract tags from category labels presented on the page.
 
 ### Common Rules
 
@@ -176,10 +176,10 @@ src/
   scrape/
     mod.rs        -- Scraper trait + dispatch logic
     cloudflare.rs -- Cloudflare page scraper
-    ollama.rs     -- Ollama API + HTML fallback scraper
-    nvidia.rs     -- NVIDIA Build page scraper
     cohere.rs     -- Cohere docs page scraper
     github.rs     -- GitHub Marketplace catalog API scraper
+    nvidia.rs     -- NVIDIA Build page scraper
+    ollama.rs     -- Ollama API + HTML fallback scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
