@@ -13,7 +13,7 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
 | Mistral AI | `https://mistral.ai/models/` | `GET https://api.mistral.ai/v1/models` (requires API key) | Open-weight/free models only |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
-| Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
+| Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | Free cloud inference models only |
 | Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
 | OpenRouter | `https://openrouter.ai/models?max_output_price=0&output_modalities=text` | `GET https://openrouter.ai/api/v1/models` | Free models only (price = $0) |
 
@@ -186,9 +186,11 @@ Options:
 
 - Primary: Use the official Ollama API endpoint if available (`https://ollama.com/api/models` or similar documented endpoint).
 - Fallback: Parse the HTML at `https://ollama.com/search?c=cloud` when the API is unavailable.
-- All Ollama models are open-source and free to use. Mark all collected models as `free: true`.
+- Only collect models that offer free cloud inference. Skip models that require payment for API usage — even though the model weights are open-source, cloud hosting costs may apply.
+- Look for a free tier indicator, tag, or price label on each model card. If a model has a non-zero price, skip it.
 - The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
 - Extract tags from category labels presented on the page.
+- Mark all collected models as `free: true`.
 
 ### Pollinations AI
 
