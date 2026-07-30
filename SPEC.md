@@ -13,6 +13,7 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | Kilo AI Gateway | `https://kilo.ai/docs/gateway/models-and-providers` | `GET https://api.kilo.ai/api/gateway/models` | Free models only (identified by `:free` suffix) |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
 | Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | All models (Ollama is fully open-source/free) |
+| OpenRouter | `https://openrouter.ai/models?max_output_price=0&output_modalities=text` | `GET https://openrouter.ai/api/v1/models` | Free models only (price = $0) |
 
 > **Note**: The API endpoint for listing models is the preferred method. However, since we have no access to it, we have no choice but to use the HTML page.
 
@@ -39,7 +40,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"nvidia"`, or `"ollama"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"nvidia"`, `"ollama"`, or `"openrouter"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -58,7 +59,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, nvidia, ollama, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, nvidia, ollama, openrouter, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -176,6 +177,24 @@ Options:
 - The HTML fallback must not fail if page structure changes slightly — use fuzzy selectors and skip unrecognized blocks.
 - Extract tags from category labels presented on the page.
 
+### OpenRouter
+
+- Primary (preferred): `GET https://openrouter.ai/api/v1/models` (public, no authentication required).
+  - Returns a JSON object with a `data` array. Each entry maps as follows:
+    - `source` -> `"openrouter"`
+    - `api_name` -> `id` field (e.g. `"qwen/qwen3.7-flash"`)
+    - `name` -> `name` field
+    - `provider` -> extract from the `id` prefix (e.g. `"qwen/qwen3.7-flash"` -> `"qwen"`)
+    - `context_length` -> `context_length` field
+    - `pricing` -> object with `prompt` and `completion` price strings (per token)
+  - **Free model filter**: Only collect models where both `pricing.prompt` and `pricing.completion` are `"0"`. Skip all paid models.
+  - Model IDs often (but not always) end with `:free` suffix for free models. Always verify via pricing fields rather than relying on the suffix.
+  - No pagination needed; the endpoint returns all models in a single response.
+- Fallback: Parse the HTML at `https://openrouter.ai/models?max_output_price=0&output_modalities=text`.
+  - The page is client-side rendered (React), so the scraper may need a headless browser or SSR snapshot.
+  - The URL already filters for free (`max_output_price=0`) text-output models.
+  - Extract model cards from the rendered grid.
+
 ### Common Rules
 
 - **Free models only**: Only collect models that are available at no cost. Set `free: true` for all output models. Skip any model that requires payment. The definition of "free" per source is detailed in the source-specific sections above.
@@ -228,6 +247,7 @@ src/
     kilo.rs       -- Kilo AI Gateway API + HTML fallback scraper
     nvidia.rs     -- NVIDIA Build page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
+    openrouter.rs -- OpenRouter API + HTML fallback scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
