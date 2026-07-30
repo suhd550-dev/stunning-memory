@@ -10,7 +10,8 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 | Cohere | `https://docs.cohere.com/docs/models` | All documented models |
-| GitHub Marketplace | `GET https://models.github.ai/catalog/models` | All models in GitHub Marketplace (API, no auth required) |
+| GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models in GitHub Marketplace |
+| | `https://github.com/marketplace?type=models` (HTML fallback) | |
 
 ## Data Model
 
@@ -112,18 +113,23 @@ Options:
 
 ### GitHub Marketplace
 
-- API: `GET https://models.github.ai/catalog/models` (public, no authentication required).
-- Response is a JSON array. Each entry maps to the data model as follows:
-  - `source` -> `"github"`
-  - `api_name` -> `id` field (e.g. `"openai/gpt-4.1"`)
-  - `name` -> `name` field
-  - `provider` -> `publisher` field
-  - `tags` -> `tags` array
-  - `context_length` -> `limits.max_input_tokens`
-  - `url` -> `html_url` field
-  - `capabilities` -> `capabilities` array (stored in a `capabilities` field if desired)
-- No pagination needed; the endpoint returns all models in a single response.
-- The API only returns active models; no explicit deprecated filtering is needed.
+- **Primary (preferred)**: `GET https://models.github.ai/catalog/models` (public, no authentication required).
+  - Response is a JSON array. Each entry maps to the data model as follows:
+    - `source` -> `"github"`
+    - `api_name` -> `id` field (e.g. `"openai/gpt-4.1"`)
+    - `name` -> `name` field
+    - `provider` -> `publisher` field
+    - `tags` -> `tags` array
+    - `context_length` -> `limits.max_input_tokens`
+    - `url` -> `html_url` field
+    - `capabilities` -> `capabilities` array (stored in a `capabilities` field if desired)
+  - No pagination needed; the endpoint returns all models in a single response.
+  - The API only returns active models; no explicit deprecated filtering is needed.
+- **Fallback**: Parse the HTML at `https://github.com/marketplace?type=models` when the API is unavailable.
+  - The page requires authentication; the scraper must handle GitHub's sign-in redirect or use stored credentials.
+  - Extract model cards from the marketplace grid listing.
+  - Extract `api_name` from the model's card data or URL path (e.g. `/marketplace/models/azure-openai/gpt-4-1` -> `openai/gpt-4.1`).
+  - Fallback to HTML scraping only for non-interactive/SSR rendered content; skip dynamic client-side rendered sections.
 
 ### Common Rules
 
