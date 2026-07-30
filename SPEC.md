@@ -16,8 +16,9 @@ A Rust CLI tool that scrapes **free** AI model metadata (names, API identifiers,
 | Modal | `https://modal.com/library` | — (data compiled into JS bundle) | Open-source models deployable on Modal |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | — | Coding-tagged models with free tier |
 | Ollama | `https://ollama.com/search?c=cloud` | `https://ollama.com/api/models` | Free cloud inference models only |
-| Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
 | OpenRouter | `https://openrouter.ai/models?max_output_price=0&output_modalities=text` | `GET https://openrouter.ai/api/v1/models` | Free models only (price = $0) |
+| Pollinations AI | `https://gen.pollinations.ai/docs#tag/models` | `GET https://gen.pollinations.ai/models` | All models (virtual pollen currency, free to use) |
+| Requesty | `https://www.requesty.ai/models?free=1` | `GET https://router.requesty.ai/v1/models` | Free models only (price = $0) |
 
 > **Note**: The API endpoint for listing models is the preferred method. However, since we have no access to it, we have no choice but to use the HTML page.
 
@@ -44,7 +45,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"modal"`, `"nvidia"`, `"ollama"`, `"openrouter"`, or `"pollinations"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"kilo"`, `"llm7"`, `"mistral"`, `"modal"`, `"nvidia"`, `"ollama"`, `"openrouter"`, `"pollinations"`, or `"requesty"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -63,7 +64,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, llm7, mistral, modal, nvidia, ollama, openrouter, pollinations, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, kilo, llm7, mistral, modal, nvidia, ollama, openrouter, pollinations, requesty, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -220,23 +221,6 @@ Options:
 - Extract tags from category labels presented on the page.
 - Mark all collected models as `free: true`.
 
-### Pollinations AI
-
-- Primary (preferred): `GET https://gen.pollinations.ai/models` (public, no authentication required).
-  - Returns a JSON array of model objects. Each entry maps as follows:
-    - `source` -> `"pollinations"`
-    - `api_name` -> `name` field (e.g. `"openai"`, `"gpt-oss"`)
-    - `name` -> `title` field (e.g. `"GPT-5.4 Nano"`)
-    - `provider` -> `brand` field (e.g. `"OpenAI"`, `"Meta"`, `"Google"`)
-    - `context_length` -> `context_length` field
-    - `tags` -> `category` field (e.g. `"text"`, `"image"`, `"audio"`)
-    - `input_modalities` -> `input_modalities` array
-    - `output_modalities` -> `output_modalities` array
-    - `pricing` -> object with `currency: "pollen"` (virtual currency, not real money)
-  - All models use a virtual "pollen" currency and are free to use. Mark all as `free: true`.
-  - No pagination needed; the endpoint returns all 240+ models in a single response.
-  - Filter to text-output models only: only collect models where `"text"` is in `output_modalities`.
-
 ### OpenRouter
 
 - Primary (preferred): `GET https://openrouter.ai/api/v1/models` (public, no authentication required).
@@ -254,6 +238,35 @@ Options:
   - The page is client-side rendered (React), so the scraper may need a headless browser or SSR snapshot.
   - The URL already filters for free (`max_output_price=0`) text-output models.
   - Extract model cards from the rendered grid.
+
+### Pollinations AI
+
+- Primary (preferred): `GET https://gen.pollinations.ai/models` (public, no authentication required).
+  - Returns a JSON array of model objects. Each entry maps as follows:
+    - `source` -> `"pollinations"`
+    - `api_name` -> `name` field (e.g. `"openai"`, `"gpt-oss"`)
+    - `name` -> `title` field (e.g. `"GPT-5.4 Nano"`)
+    - `provider` -> `brand` field (e.g. `"OpenAI"`, `"Meta"`, `"Google"`)
+    - `context_length` -> `context_length` field
+    - `tags` -> `category` field (e.g. `"text"`, `"image"`, `"audio"`)
+    - `input_modalities` -> `input_modalities` array
+    - `output_modalities` -> `output_modalities` array
+    - `pricing` -> object with `currency: "pollen"` (virtual currency, not real money)
+  - All models use a virtual "pollen" currency and are free to use. Mark all as `free: true`.
+  - No pagination needed; the endpoint returns all 240+ models in a single response.
+  - Filter to text-output models only: only collect models where `"text"` is in `output_modalities`.
+
+### Requesty
+
+- Primary (preferred): `GET https://router.requesty.ai/v1/models` (public, no authentication required).
+  - Returns a JSON object with a `data` array. Each entry maps as follows:
+    - `source` -> `"requesty"`
+    - `api_name` -> `id` field (e.g. `"anthropic/claude-haiku-4-5"`)
+    - `provider` -> extract from the `id` prefix (e.g. `"anthropic/claude-haiku-4-5"` -> `"anthropic"`)
+    - `context_length` -> `context_window` field
+    - `max_output_tokens` -> `max_output_tokens` field
+  - **Free model filter**: Only collect models where both `input_price` and `output_price` are `0`. Skip all paid models.
+  - No pagination needed; the endpoint returns 589 models in a single response.
 
 ### Common Rules
 
@@ -312,6 +325,7 @@ src/
     ollama.rs     -- Ollama API + HTML fallback scraper
     openrouter.rs -- OpenRouter API + HTML fallback scraper
     pollinations.rs -- Pollinations AI API scraper
+    requesty.rs    -- Requesty API scraper
   model.rs        -- Model struct + serialization
   error.rs        -- Custom error types
 ```
