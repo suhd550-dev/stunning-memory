@@ -1,7 +1,7 @@
 #!/bin/bash
 
-SRC="$HOME/.local/share/opencode/sessions.db"
-DST="/workspace/sessions.db"
+SRC="$HOME/.local/share/opencode/opencode.db"
+DST="/workspace/opencode.db"
 
 if [ ! -f "$SRC" ]; then
   echo "Error: $SRC not found" >&2
