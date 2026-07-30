@@ -10,6 +10,7 @@ A Rust CLI tool that scrapes AI model metadata (names, API identifiers, paramete
 | Cohere | `https://docs.cohere.com/docs/models` | All documented models |
 | GitHub Marketplace | `GET https://models.github.ai/catalog/models` (preferred) | All models in GitHub Marketplace |
 | | `https://github.com/marketplace?type=models` (HTML fallback) | |
+| Groq | `https://console.groq.com/docs/models` | All listed models (API auth required) |
 | NVIDIA Build | `https://build.nvidia.com/models?orderBy=dateCreated%3ADESC&label=Coding` | Coding-tagged models only |
 | Ollama | `https://ollama.com/search?c=cloud` | Cloud category models |
 
@@ -36,7 +37,7 @@ Each discovered model is normalized to the following schema:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"nvidia"`, or `"ollama"` |
+| `source` | string | yes | Origin provider key: `"cloudflare"`, `"cohere"`, `"github"`, `"groq"`, `"nvidia"`, or `"ollama"` |
 | `api_name` | string | yes | Fully-qualified API identifier used in requests |
 | `slug` | string | yes | URL-safe short identifier |
 | `name` | string | yes | Human-readable display name |
@@ -54,7 +55,7 @@ Each discovered model is normalized to the following schema:
 Usage: model-discovery [OPTIONS] <SOURCE>
 
 Arguments:
-  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, nvidia, ollama, all]
+  <SOURCE>  Source to scrape [possible values: cloudflare, cohere, github, groq, nvidia, ollama, all]
 
 Options:
   -o, --output <FILE>    Write output JSON to file (default: stdout)
@@ -114,6 +115,21 @@ Options:
   - Extract model cards from the marketplace grid listing.
   - Extract `api_name` from the model's card data or URL path (e.g. `/marketplace/models/azure-openai/gpt-4-1` -> `openai/gpt-4.1`).
   - Fallback to HTML scraping only for non-interactive/SSR rendered content; skip dynamic client-side rendered sections.
+
+### Groq
+
+- Primary (preferred): Use the Groq API at `GET https://api.groq.com/openai/v1/models`. Requires `Authorization: Bearer <GROQ_API_KEY>` header. Returns a JSON array of active models with `id`, `owned_by`, `created`, etc.
+  - `source` -> `"groq"`
+  - `api_name` -> `id` field (e.g. `"llama-3.3-70b-versatile"`)
+  - `provider` -> `owned_by` field
+- Fallback: Parse the HTML at `https://console.groq.com/docs/models` when the API key is unavailable.
+  - The page lists models in tables with columns: MODEL ID, SPEED, PRICE, RATE LIMITS, CONTEXT WINDOW, MAX COMPLETION TOKENS.
+  - Extract `api_name` from the MODEL ID column.
+  - Extract `context_length` from the CONTEXT WINDOW column.
+  - Extract `provider` from the model name/icon label (e.g. Meta, OpenAI, Alibaba Cloud).
+  - Extract `tags` from section headers: Production Models, Preview Models, Systems.
+  - Skip the **Deprecated Models** section entirely.
+  - Skip Preview models unless explicitly requested (they are marked as not for production use).
 
 ### NVIDIA Build
 
@@ -178,6 +194,7 @@ src/
     cloudflare.rs -- Cloudflare page scraper
     cohere.rs     -- Cohere docs page scraper
     github.rs     -- GitHub Marketplace catalog API scraper
+    groq.rs       -- Groq API + HTML fallback scraper
     nvidia.rs     -- NVIDIA Build page scraper
     ollama.rs     -- Ollama API + HTML fallback scraper
   model.rs        -- Model struct + serialization
